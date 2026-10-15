@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Инвентаризация">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>Инвентаризация iPhone v5</title>
+<title>Инвентаризация iPhone v5.1</title>
 <style>
   :root { --fg:#111; --muted:#666; --ok:#1b7f3b; --err:#c62828; --warn:#b26a00; --line:#ddd; --accent:#d9480f; --blue:#1565c0; }
   * { box-sizing:border-box; }
@@ -92,7 +92,7 @@
 </style>
 </head>
 <body>
-<header><b>Инвентаризация · iPhone v5</b><span id="store">автосохранение</span></header>
+<header><b>Инвентаризация · iPhone v5.1</b><span id="store">автосохранение</span></header>
 <div class="wrap">
 
   <!-- ===== Экран 1: смена ===== -->
@@ -188,7 +188,7 @@ var ZONES = [
   { name: 'Центральный склад', sub: ['Подзона А', 'Подзона Б', 'Подзона В', 'Подзона Г', 'Подзона Д', 'Подзона Е',
                                      'Подзона Ж', 'Подзона И', 'Подзона К', 'Подзона Л', 'Подзона М', 'Подзона Н'] }
 ];
-var VERSION = 'iPhone v5';
+var VERSION = 'iPhone v5.1';
 /* Библиотека распознавания для iPhone (Android использует встроенный модуль Chrome) */
 var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
 /* ========================================================== */
@@ -516,9 +516,17 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
   // ---------- камера (телефоны) ----------
   var camStream = null, camTimer = null, zxReader = null, camOn = false, lastCam = { c: '', t: 0 };
   function camState(t) { $('camState').textContent = t; }
+  var camCand = { c: '', n: 0, t: 0 };
   function onCamCode(code) {
     code = String(code).trim();
     var now = Date.now();
+    // защита от ложных чтений: цифровой код — только EAN-13 с верной контрольной цифрой
+    if (/^\d+$/.test(code) && !(code.length === 13 && eanOk(code))) return;
+    if (!/^\d+$/.test(code) && code.length < 6) return;
+    // код засчитывается, если прочитан одинаково в двух кадрах подряд
+    if (code === camCand.c && now - camCand.t < 1500) camCand.n++; else camCand = { c: code, n: 1, t: now };
+    camCand.t = now;
+    if (camCand.n < 2) { camState('Держите ровно…'); return; }
     if (code === lastCam.c && now - lastCam.t < 3000) return;     // тот же код ещё в кадре
     lastCam = { c: code, t: now };
     if (state.pending) { msg('Сначала укажите количество для ' + state.pending.c, 'err'); beep(300, 200); return; }
@@ -547,12 +555,12 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
   }
   function startNative() {
     var det;
-    try { det = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128'] }); }
+    try { det = new window.BarcodeDetector({ formats: ['ean_13', 'code_128'] }); }
     catch (e) { startZxing(); return; }
     navigator.mediaDevices.getUserMedia(CONSTR).then(function (st) {
       if (!camOn) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
       camStream = st; var v = $('camVideo'); v.srcObject = st; v.play();
-      camState('Наведите рамку на штрихкод');
+      camState('Наведите рамку на штрихкод (горизонтально)');
       (function loop() {
         if (!camOn) return;
         if (v.readyState >= 2) {
@@ -566,10 +574,10 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
     function go() {
       try {
         var Z = window.ZXing, hints = new Map();
-        hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.EAN_8, Z.BarcodeFormat.CODE_128]);
+        hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.CODE_128]);
         hints.set(Z.DecodeHintType.TRY_HARDER, true);
         zxReader = new Z.BrowserMultiFormatReader(hints, 200);
-        camState('Наведите рамку на штрихкод');
+        camState('Наведите рамку на штрихкод (горизонтально)');
         zxReader.decodeFromConstraints(CONSTR, $('camVideo'), function (res) { if (res && camOn) onCamCode(res.getText()); })
           .catch(camFail);
       } catch (e) { camFail(e); }
