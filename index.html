@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Инвентаризация">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>Инвентаризация iPhone v5.1</title>
+<title>Инвентаризация iPhone v5.2</title>
 <style>
   :root { --fg:#111; --muted:#666; --ok:#1b7f3b; --err:#c62828; --warn:#b26a00; --line:#ddd; --accent:#d9480f; --blue:#1565c0; }
   * { box-sizing:border-box; }
@@ -74,8 +74,9 @@
   .scanrow #camBtn { flex:1; font-size:18px; padding:12px; }
   #camBtn { font-size:15px; padding:6px 8px; background:#263238; color:#fff; border-color:#263238; }
   #camBox { display:none; margin:6px 0; border:3px solid #263238; border-radius:8px; overflow:hidden; background:#000; position:relative; }
-  #camBox video { width:100%; max-height:48vh; display:block; object-fit:cover; }
-  #camBox .aim { position:absolute; left:8%; right:8%; top:38%; height:24%; border:3px solid rgba(255,80,0,.85); border-radius:6px; pointer-events:none; }
+  #camBox .vwrap { position:relative; height:36vh; min-height:200px; background:#000; }
+  #camBox video { width:100%; height:100%; display:block; object-fit:cover; }
+  #camBox .aim { position:absolute; left:6%; right:6%; top:33%; height:34%; border:3px solid rgba(255,80,0,.85); border-radius:6px; pointer-events:none; }
   #camBar { display:flex; justify-content:space-between; align-items:center; background:#263238; color:#fff; padding:4px 6px; font-size:13px; }
   #camBar button { font-size:13px; padding:4px 8px; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
@@ -92,7 +93,7 @@
 </style>
 </head>
 <body>
-<header><b>Инвентаризация · iPhone v5.1</b><span id="store">автосохранение</span></header>
+<header><b>Инвентаризация · iPhone v5.2</b><span id="store">автосохранение</span></header>
 <div class="wrap">
 
   <!-- ===== Экран 1: смена ===== -->
@@ -139,9 +140,8 @@
       <button id="camBtn">📷 Камера вкл / выкл</button>
     </div>
     <div id="camBox">
-      <video id="camVideo" playsinline muted autoplay></video>
-      <div class="aim"></div>
-      <div id="camBar"><span id="camState">Камера…</span><button id="camClose">Закрыть камеру</button></div>
+      <div class="vwrap"><video id="camVideo" playsinline muted autoplay></video><div class="aim"></div></div>
+      <div id="camBar"><span id="camState">Камера…</span><span><button id="camTorch" style="display:none">Фонарик</button> <button id="camClose">Закрыть камеру</button></span></div>
     </div>
 
     <div id="qtyBox">
@@ -188,7 +188,7 @@ var ZONES = [
   { name: 'Центральный склад', sub: ['Подзона А', 'Подзона Б', 'Подзона В', 'Подзона Г', 'Подзона Д', 'Подзона Е',
                                      'Подзона Ж', 'Подзона И', 'Подзона К', 'Подзона Л', 'Подзона М', 'Подзона Н'] }
 ];
-var VERSION = 'iPhone v5.1';
+var VERSION = 'iPhone v5.2';
 /* Библиотека распознавания для iPhone (Android использует встроенный модуль Chrome) */
 var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
 /* ========================================================== */
@@ -441,7 +441,7 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
     }
     if (state.askQty) {
       state.pending = { c: code, f: flag, t: stamp(new Date()) }; save(); renderWork();
-      $('qtyIn').value = ''; msg('Укажите количество: 1 шт или пачка', 'warn'); $('qtyIn').focus();
+      $('qtyIn').value = ''; msg('Укажите количество: 1 шт или пачка', 'warn');
     } else {
       commit(code, 1, flag); save(); renderWork();
       msg('✓ ' + code + ' — 1 шт' + (flag ? ' (' + flag + ')' : ''), flag ? 'warn' : 'ok');
@@ -454,6 +454,7 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
     commit(p.c, q, p.f, p.t); state.pending = null; save(); renderWork();
     $('qtyIn').value = ''; msg('✓ ' + p.c + ' — ' + q + ' шт' + (q > 1 ? ' (пачка)' : ''), 'ok'); beep(1200, 60);
     try { $('qtyIn').blur(); } catch (e) {}
+    if (window.camAfter) window.camAfter(p.c, true);
   }
   function processRaw(raw) {
     var tokens = raw.split(/[\s,;]+/);
@@ -495,7 +496,9 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
   });
   $('qCancel').addEventListener('click', function () {
     if (!state.pending) return;
-    var c = state.pending.c; state.pending = null; save(); renderWork(); msg('Скан ' + c + ' отменён', 'warn'); $('scan').focus();
+    var c = state.pending.c; state.pending = null; save(); renderWork(); msg('Скан ' + c + ' отменён — сканируйте заново', 'warn');
+    try { $('qtyIn').blur(); } catch (e) {}
+    if (window.camAfter) window.camAfter(c, false);
   });
   $('askQty').addEventListener('change', function () {
     if (state.pending) { $('askQty').checked = true; msg('Сначала укажите количество для ' + state.pending.c, 'err'); return; }
@@ -516,7 +519,31 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
   // ---------- камера (телефоны) ----------
   var camStream = null, camTimer = null, zxReader = null, camOn = false, lastCam = { c: '', t: 0 };
   function camState(t) { $('camState').textContent = t; }
-  var camCand = { c: '', n: 0, t: 0 };
+  var camCand = { c: '', n: 0, t: 0 }, lastDup = '';
+  // после подтверждения количества или отмены — продолжить сканирование
+  window.camAfter = function (code, done) {
+    camCand = { c: '', n: 0, t: 0 };
+    lastCam = done ? { c: code, t: Date.now() } : { c: '', t: 0 };   // после отмены ту же бирку можно сразу пересканировать
+    camResume();
+    if (camOn) camState('Наведите рамку на штрихкод');
+  };
+  function camResume() {
+    var v = $('camVideo');
+    if (camOn && v && v.srcObject && v.paused) { try { var pr = v.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {} }
+  }
+  setInterval(function () { if (!document.hidden) camResume(); }, 1500);   // видео «замерло» — запустить снова
+  function camExtras() {   // фонарик и непрерывная фокусировка, если камера поддерживает
+    try {
+      var st = $('camVideo').srcObject, tr = st && st.getVideoTracks()[0];
+      if (!tr || !tr.getCapabilities) return;
+      var cap = tr.getCapabilities();
+      if (cap.focusMode && cap.focusMode.indexOf('continuous') >= 0) tr.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {});
+      if (cap.torch) {
+        var on = false, b = $('camTorch'); b.style.display = 'inline-block';
+        b.onclick = function () { on = !on; tr.applyConstraints({ advanced: [{ torch: on }] }).catch(function () {}); b.textContent = on ? 'Фонарик выкл' : 'Фонарик'; };
+      }
+    } catch (e) {}
+  }
   function onCamCode(code) {
     code = String(code).trim();
     var now = Date.now();
@@ -527,9 +554,10 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
     if (code === camCand.c && now - camCand.t < 1500) camCand.n++; else camCand = { c: code, n: 1, t: now };
     camCand.t = now;
     if (camCand.n < 2) { camState('Держите ровно…'); return; }
+    if (state.pending) { camState('Сначала укажите количество'); return; }   // пока ждём количество — сканы молча игнорируются
     if (code === lastCam.c && now - lastCam.t < 3000) return;     // тот же код ещё в кадре
     lastCam = { c: code, t: now };
-    if (state.pending) { msg('Сначала укажите количество для ' + state.pending.c, 'err'); beep(300, 200); return; }
+    if (seen[code]) { if (lastDup === code) return; lastDup = code; } else lastDup = '';
     try { if (navigator.vibrate) navigator.vibrate(80); } catch (e) {}
     camState('Считано: ' + code);
     processRaw(code);
@@ -539,11 +567,11 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
     clearTimeout(camTimer); camTimer = null;
     if (zxReader) { try { zxReader.reset(); } catch (e) {} zxReader = null; }
     if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
-    $('camVideo').srcObject = null;
+    $('camVideo').srcObject = null; $('camTorch').style.display = 'none';
     $('camBox').style.display = 'none';
   };
   var camStop = window.camStop;
-  var CONSTR = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false };
+  var CONSTR = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false };
   window.camStart = camStart;
   function camStart() {
     if (camOn) return;
@@ -559,13 +587,13 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
     catch (e) { startZxing(); return; }
     navigator.mediaDevices.getUserMedia(CONSTR).then(function (st) {
       if (!camOn) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
-      camStream = st; var v = $('camVideo'); v.srcObject = st; v.play();
+      camStream = st; var v = $('camVideo'); v.srcObject = st; v.play(); setTimeout(camExtras, 800);
       camState('Наведите рамку на штрихкод (горизонтально)');
       (function loop() {
         if (!camOn) return;
         if (v.readyState >= 2) {
           det.detect(v).then(function (r) { if (r && r.length) onCamCode(r[0].rawValue); })
-            .catch(function () {}).then(function () { if (camOn) camTimer = setTimeout(loop, 180); });
+            .catch(function () {}).then(function () { if (camOn) camTimer = setTimeout(loop, 120); });
         } else camTimer = setTimeout(loop, 200);
       })();
     }).catch(camFail);
@@ -576,9 +604,10 @@ var ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
         var Z = window.ZXing, hints = new Map();
         hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.CODE_128]);
         hints.set(Z.DecodeHintType.TRY_HARDER, true);
-        zxReader = new Z.BrowserMultiFormatReader(hints, 200);
+        zxReader = new Z.BrowserMultiFormatReader(hints, 100);
         camState('Наведите рамку на штрихкод (горизонтально)');
         zxReader.decodeFromConstraints(CONSTR, $('camVideo'), function (res) { if (res && camOn) onCamCode(res.getText()); })
+          .then(function () { setTimeout(camExtras, 800); })
           .catch(camFail);
       } catch (e) { camFail(e); }
     }
