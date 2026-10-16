@@ -1,11 +1,11 @@
 {
- "name": "Инвентаризация · iPhone v5.2",
+ "name": "Инвентаризация · iPhone v5.3",
  "short_name": "Инвентаризация",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",
  "background_color": "#ffffff",
- "theme_color": "#d9480f",
+ "theme_color": "#274689",
  "icons": [
   {
    "src": "icon-192.png",

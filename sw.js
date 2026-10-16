@@ -1,6 +1,6 @@
 // Кэширование «Сборщика ШК iPhone»: работа без интернета после первого открытия.
 // При обновлении файлов на сайте увеличьте номер версии ниже.
-var CACHE = 'inv-iphone-v5.2-1';
+var CACHE = 'inv-iphone-v5.3-1';
 var FILES = ['./', 'index.html', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'manifest.json'];
 var ZXING = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
 self.addEventListener('install', function (e) {
